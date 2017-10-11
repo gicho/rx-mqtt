@@ -1,6 +1,7 @@
 package rx.mqtt.android;
 
 import android.content.Context;
+import android.util.Pair;
 
 import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.client.mqttv3.DisconnectedBufferOptions;
@@ -99,25 +100,25 @@ public class RxMqtt {
      */
     @NonNull
     @CheckReturnValue
-    public static Observable<MqttMessage> message(@NonNull final MqttAndroidClient client,
-                                                  @NonNull final String topic) {
-        final Observable<MqttMessage> msgObs =
-                Observable.create(new ObservableOnSubscribe<MqttMessage>() {
-            @Override
-            public void subscribe(
-                    @NonNull final ObservableEmitter<MqttMessage> emitter) throws Exception {
-                client.subscribe(topic, 0, new IMqttMessageListener() {
+    public static Observable<Pair<MqttMessage, String>> message(@NonNull final MqttAndroidClient client,
+                                                                @NonNull final String topic) {
+        final Observable<Pair<MqttMessage, String>> msgObs =
+                Observable.create(new ObservableOnSubscribe<Pair<MqttMessage, String>>() {
                     @Override
-                    public void messageArrived(
-                            String topic2,
-                            @NonNull final MqttMessage message) throws Exception {
-                        if (!emitter.isDisposed()) {
-                            emitter.onNext(message);
-                        }
+                    public void subscribe(
+                            @NonNull final ObservableEmitter<Pair<MqttMessage, String>> emitter) throws Exception {
+                        client.subscribe(topic, 0, new IMqttMessageListener() {
+                            @Override
+                            public void messageArrived(
+                                    String topic2,
+                                    @NonNull final MqttMessage message) throws Exception {
+                                if (!emitter.isDisposed()) {
+                                    emitter.onNext(new Pair<MqttMessage, String>(message, topic2));
+                                }
+                            }
+                        });
                     }
                 });
-            }
-        });
 
         if (client.isConnected()) {
             return msgObs;
@@ -125,12 +126,12 @@ public class RxMqtt {
             MqttConnectOptions options = new MqttConnectOptions();
             options.setCleanSession(true);
             return connect(client, options).flatMapObservable(
-                    new Function<IMqttToken, ObservableSource<MqttMessage>>() {
-                @Override
-                public ObservableSource<MqttMessage> apply(IMqttToken token) throws Exception {
-                    return msgObs;
-                }
-            });
+                    new Function<IMqttToken, ObservableSource<Pair<MqttMessage, String>>>() {
+                        @Override
+                        public ObservableSource<Pair<MqttMessage, String>> apply(IMqttToken token) throws Exception {
+                            return msgObs;
+                        }
+                    });
         }
     }
 
